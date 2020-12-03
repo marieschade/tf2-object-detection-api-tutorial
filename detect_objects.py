@@ -6,14 +6,13 @@ import argparse
 from detector import DetectorTF2
 
 
-def DetectFromVideo(detector, Video_path, save_output=False, output_dir='output/'):
+def DetectFromVideo(detector, Video_path, save_output=False, output_dir='output/', show_output=False):
 
 	cap = cv2.VideoCapture(Video_path)
-	if save_output:
-		output_path = os.path.join(output_dir, 'detection_'+ Video_path.split("/")[-1])
-		frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-		frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-		out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), 30, (frame_width, frame_height))
+	output_path = os.path.join(output_dir, 'detection_'+ Video_path.split("/")[-1])
+	frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+	frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+	out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), 30, (frame_width, frame_height))
 
 	while (cap.isOpened()):
 		ret, img = cap.read()
@@ -23,19 +22,18 @@ def DetectFromVideo(detector, Video_path, save_output=False, output_dir='output/
 		det_boxes = detector.DetectFromImage(img)
 		elapsed_time = round((time.time() - timestamp1) * 1000) #ms
 		img = detector.DisplayDetections(img, det_boxes, det_time=elapsed_time)
+		
+		if show_output:
+			cv2.imshow('TF2 Detection', img)
+			if cv2.waitKey(1) == 27: break
 
-		cv2.imshow('TF2 Detection', img)
-		if cv2.waitKey(1) == 27: break
-
-		if save_output:
-			out.write(img)
+		out.write(img)
 
 	cap.release()
-	if save_output:
-		out.release()
+	out.release()
 
 
-def DetectImagesFromFolder(detector, images_dir, save_output=False, output_dir='output/'):
+def DetectImagesFromFolder(detector, images_dir, output_dir='output/', show_output=False, save_txt=False):
 
 	for file in os.scandir(images_dir):
 		if file.is_file() and file.name.endswith(('.jpg', '.jpeg', '.png')) :
@@ -43,14 +41,36 @@ def DetectImagesFromFolder(detector, images_dir, save_output=False, output_dir='
 			print(image_path)
 			img = cv2.imread(image_path)
 			det_boxes = detector.DetectFromImage(img)
+			
+			if save_txt:
+				txt_path = os.path.join(output_dir, '/predicted_labels')
+				if file.name.endswith(('.jpg')) :
+					file_name = file.name.split(".jpg",1)[0]
+				if file.name.endswith(('.jpeg')) :
+					file_name = file.name.split(".jpeg",1)[0]
+				if file.name.endswith(('.png')) :
+					file_name = file.name.split(".png",1)[0]
+				for idx in range(len(det_boxes)):
+					x_min = str(boxes_list[idx][0])
+					y_min = str(boxes_list[idx][1])
+					x_max = str(boxes_list[idx][2])
+					y_max = str(boxes_list[idx][3])
+					cls = str(boxes_list[idx][4])
+					score = str(boxes_list[idx][-1])
+		
+					line = (cls, score, x_min, y_min, x_max, y_max)
+                        		with open(txt_path + '.txt', 'a') as f:
+                            			f.write(('%g ' * len(line)).rstrip() % line + '\n')
+				
+			
 			img = detector.DisplayDetections(img, det_boxes)
+			
+			if show_output:
+				cv2.imshow('TF2 Detection', img)
+				cv2.waitKey(0)
 
-			cv2.imshow('TF2 Detection', img)
-			cv2.waitKey(0)
-
-			if save_output:
-				img_out = os.path.join(output_dir, file.name)
-				cv2.imwrite(img_out, img)
+			img_out = os.path.join(output_dir, file.name)
+			cv2.imwrite(img_out, img)
 
 
 if __name__ == "__main__":
@@ -67,7 +87,11 @@ if __name__ == "__main__":
 	parser.add_argument('--video_path', help='Path to input video)', default='data/samples/pedestrian_test.mp4')
 	parser.add_argument('--output_directory', help='Path to output images and video', default='data/samples/output')
 	parser.add_argument('--video_input', help='Flag for video input, default: False', action='store_true')  # default is false
-	parser.add_argument('--save_output', help='Flag for save images and video with detections visualized, default: False',
+	#parser.add_argument('--save_output', help='Flag for save images and video with detections visualized, default: False',
+	#                    action='store_true')  # default is false
+	parser.add_argument('--show_output', help='Flag for showing images right after detection, default: False',
+	                    action='store_true')  # default is false
+	parser.add_argument('--save_txt', help='Save bounding box .txt file for every image, default: False',
 	                    action='store_true')  # default is false
 	args = parser.parse_args()
 
@@ -75,17 +99,21 @@ if __name__ == "__main__":
 	if args.class_ids is not None:
 		id_list = [int(item) for item in args.class_ids.split(',')]
 
-	if args.save_output:
-		if not os.path.exists(args.output_directory):
-			os.makedirs(args.output_directory)
+	if not os.path.exists(args.output_directory):
+		os.makedirs(args.output_directory) # create output directory
+				
+	if args.save_txt:
+		os.chdir(args.output_directory)
+		if not os.path.exists('predicted_labels'):
+			os.makedirs('predicted_labels') # create predicted_labels directory
 
 	# instance of the class DetectorTF2
 	detector = DetectorTF2(args.model_path, args.path_to_labelmap, class_id=id_list, threshold=args.threshold)
 
 	if args.video_input:
-		DetectFromVideo(detector, args.video_path, save_output=args.save_output, output_dir=args.output_directory)
+		DetectFromVideo(detector, args.video_path, output_dir=args.output_directory, show_output=args.show_output)
 	else:
-		DetectImagesFromFolder(detector, args.images_dir, save_output=args.save_output, output_dir=args.output_directory)
+		DetectImagesFromFolder(detector, args.images_dir, output_dir=args.output_directory, show_output=args.show_output, save_txt=args.save_txt)
 
 	print("Done ...")
 	cv2.destroyAllWindows()
