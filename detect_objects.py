@@ -34,7 +34,7 @@ def DetectFromVideo(detector, Video_path, save_output=False, output_dir='output/
 
 
 def DetectImagesFromFolder(detector, images_dir, output_dir='output/', show_output=False, save_txt=False):
-
+	
 	for file in os.scandir(images_dir):
 		if file.is_file() and file.name.endswith(('.jpg', '.jpeg', '.png')) :
 			image_path = os.path.join(images_dir, file.name)
@@ -43,24 +43,24 @@ def DetectImagesFromFolder(detector, images_dir, output_dir='output/', show_outp
 			det_boxes = detector.DetectFromImage(img)
 			
 			if save_txt:
-				txt_path = os.path.join(output_dir, '/predicted_labels')
 				if file.name.endswith(('.jpg')) :
 					file_name = file.name.split(".jpg",1)[0]
 				if file.name.endswith(('.jpeg')) :
 					file_name = file.name.split(".jpeg",1)[0]
 				if file.name.endswith(('.png')) :
 					file_name = file.name.split(".png",1)[0]
+				txt_path = os.path.join(output_dir, 'predicted_labels', file_name) # set output path for .txt file
 				for idx in range(len(det_boxes)):
-					x_min = str(boxes_list[idx][0])
-					y_min = str(boxes_list[idx][1])
-					x_max = str(boxes_list[idx][2])
-					y_max = str(boxes_list[idx][3])
-					cls = str(boxes_list[idx][4])
-					score = str(boxes_list[idx][-1])
-		
-					line = (cls, score, x_min, y_min, x_max, y_max)
-                        		with open(txt_path + '.txt', 'a') as f:
-                            			f.write(('%g ' * len(line)).rstrip() % line + '\n')
+					x_min = str(det_boxes[idx][0])
+					y_min = str(det_boxes[idx][1])
+					x_max = str(det_boxes[idx][2])
+					y_max = str(det_boxes[idx][3])
+					cls = str(det_boxes[idx][4])
+					score = str(det_boxes[idx][-1])
+					
+					with open(txt_path + '.txt', 'a') as f:
+						f.write(cls + ' ' + score + ' ' + x_min + ' ' + y_min + ' ' + x_max + ' ' + y_max + '\n')
+				
 				
 			
 			img = detector.DisplayDetections(img, det_boxes)
@@ -109,11 +109,13 @@ if __name__ == "__main__":
 
 	# instance of the class DetectorTF2
 	detector = DetectorTF2(args.model_path, args.path_to_labelmap, class_id=id_list, threshold=args.threshold)
+	
+	t0 = time.time()
 
 	if args.video_input:
 		DetectFromVideo(detector, args.video_path, output_dir=args.output_directory, show_output=args.show_output)
 	else:
 		DetectImagesFromFolder(detector, args.images_dir, output_dir=args.output_directory, show_output=args.show_output, save_txt=args.save_txt)
 
-	print("Done ...")
+	print('Done. (%.3fs)' % (time.time() - t0))
 	cv2.destroyAllWindows()
