@@ -118,4 +118,4 @@ if __name__ == "__main__":
 		DetectImagesFromFolder(detector, args.images_dir, output_dir=args.output_directory, show_output=args.show_output, save_txt=args.save_txt)
 
 	print('Done. (%.3fs)' % (time.time() - t0))
-	cv2.destroyAllWindows()
+	#cv2.destroyAllWindows()
